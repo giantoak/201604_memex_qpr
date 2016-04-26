@@ -133,7 +133,6 @@ def score_metrics(y_test, y_pred):
     true_positive_rate= true_positives/float(true_positives + false_negatives)
     true_negative_rate = (true_negatives/float(true_negatives + false_positives))
     accuracy = (true_positives + true_negatives)/float(true_positives + true_negatives+false_positives + false_negatives)
-    ipdb.set_trace()
     return(
             {
                 'true_positive_rate':true_positive_rate,
@@ -151,16 +150,22 @@ def all_scoring_metrics(clf, X, y, stratified_kfold):
         y_test=y.loc[test]
 
     output_features = score_metrics(y_test, y_pred)
-    #output_features.update({i[0]:i[1] for i in zip(X.columns, clf.feature_importances_)})
+    output_features.update({i[0]:i[1] for i in zip(X.columns, clf.feature_importances_)})
     output_features['roc_auc'] = roc_auc_score(y_test, clf.predict_proba(X.loc[test])[:,1])
     out.append(output_features)
     return pd.DataFrame(out)
 
+eval_columns = ['f1','accuracy','true_negative_rate','true_positive_rate','roc_auc']
 clf = RandomForestClassifier(oob_score=True, random_state=2, n_estimators=100, n_jobs=-1, class_weight="balanced")
 del df_X['ethnicity']
 metrics = all_scoring_metrics(clf, df_X, df['class'], StratifiedKFold(df['class'], 10))
 print("Results (averaged from 10 fold cross validation and computed out of sample)")
-print(metrics)
+print(metrics[[i for i in metrics.columns if i in eval_columns]])
+importances = metrics[[i for i in metrics.columns if i not in eval_columns]]
+price_cols = ['duration_in_mins','price','price_per_min']
+print('Price importances: %s' % importances[[i for i in importances.columns if i in price_cols]].sum(axis=1).iloc[0])
+print('Age importances: %s' % importances['age'].iloc[0])
+
 #p.close()
 #p.join()
 
