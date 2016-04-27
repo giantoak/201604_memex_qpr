@@ -13,6 +13,7 @@ def disaggregated_df(df, aggregate_col, sep):
     DOES NOT save the original index
     You could definitely do this faster outside of python, but sometimes that isn't possible
     Takes a column of strings with spearators, and splits them s.t. each row gets a new entity per row.
+    
     :param pandas.DataFrame df:
     :param str aggregate_col:
     :param str sep:
@@ -39,7 +40,8 @@ def disaggregated_df(df, aggregate_col, sep):
 
 def aggregated_df(df, disaggregated_col, key_cols, sep):
     """
-    Takes a column that has been disaggregated, and fuses the contents back together
+    Takes a column that has been disaggregated, and fuses the contents back together.
+    
     :param pandas.DataFrame df:
     :param str disaggregated_col:
     :param str|list key_cols:
@@ -68,6 +70,7 @@ def dummify_df(df, cols_to_dummy, sep, vals_to_drop='nan'):
     """
     get_dummy() on a df has some issues with dataframe-level operations
     when the column has co-occuring values.
+    
     :param pandas.DataFrame df:
     :param list|str cols_to_dummy:
     :param str sep:
@@ -93,10 +96,47 @@ def dummify_df(df, cols_to_dummy, sep, vals_to_drop='nan'):
     return df
 
 
+def lr_train_tester(df_X_train, y_train, df_X_test, y_test):
+    """
+    Take some training and test data, fit a lin. reg, produce scores.
+    
+    :param pandas.DataFrame df_X_train:
+    :param pandas.Series y_train:
+    :param pandas.DataFrame df_X_tes:
+    :param pandas.Series y_test:
+    :returns: `dict` --
+    """
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import roc_curve
+    from sklearn.metrics import auc
+    # from sklearn.metrics import precision_recall_fscore_support
+    
+    lr = LinearRegression()
+    lr.fit(df_X_train, y_train)
+    y_pred = lr.predict(df_X_test)
+    fpr, tpr, thresholds = roc_curve(y_test.values, y_pred)
+    # precision, recall, f_score, support = precision_recall_fscore_support(y_test.values, y_pred)
+    return {'model':lr,
+            'y_pred': y_pred,
+            'y_test': y_test.values,
+            'lr_score': lr.score(df_X_test, y_test),
+            'roc': {'fpr': fpr,
+                    'tpr': tpr,
+                    'thresholds': thresholds,
+                    'auc': auc(fpr, tpr)},
+            # 'precision_recall': {'p': precision,
+            #                     'r': recall,
+            #                     'f1': f_score,
+            #                     'support': support}
+            }
+
+
+
 def score_metrics(y_test, y_pred):
     """
     :param y_test:
     :param y_pred:
+    :returns: `dict` --
     """
     true_positives = (y_test & y_pred).sum()
     true_negatives = ((~y_test) & (~y_pred)).sum()
@@ -122,6 +162,7 @@ def all_scoring_metrics(clf, X, y, stratified_kfold):
     :param X:
     :param y:
     :param stratified_kfold:
+    :returns: `pandas.DataFrame` --
     """
     out = []
     for i, (train, test) in enumerate(stratified_kfold):
