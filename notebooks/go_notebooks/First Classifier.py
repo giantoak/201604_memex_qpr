@@ -12,7 +12,7 @@ import ujson as json
 import multiprocessing as mp
 import numpy as np
 import pandas as pd
-import seaborn as sns
+#import seaborn as sns
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.cross_validation import ShuffleSplit
@@ -21,9 +21,13 @@ from sklearn.metrics import auc
 from sklearn.cross_validation import StratifiedKFold
 from sklearn.metrics import roc_auc_score
 from sklearn.ensemble import RandomForestClassifier
+import ipdb
 
-df = pd.read_csv('../../data/merged/data_to_use.csv')
+df = pd.read_csv('../../data/merged/data_to_use_by_ad_v2.csv')
 
+steve = pd.read_csv('../../data/merged/phones_by_month.csv')
+steve_phone=steve[['phone','n_ads','n_distinct_locations','location_tree_length','n_outcall','n_incall','n_incall_and_outcall','n_cooccurring_phones']].drop_duplicates()
+df = df.merge(steve_phone, how='left')
 
 # In[2]:
 
@@ -38,7 +42,6 @@ print(df.columns)
 # df['class'] = df['class'].isin(['positive'])
 df['class'] = df['class'].apply(lambda x: 1 if x == 'positive' else 0)
 df['class'] = df['class'].astype('bool')
-df['lt_23'] = df.age.apply(lambda x: True if x < 23 else False)
 
 
 # ## Messing around
@@ -47,18 +50,18 @@ df['lt_23'] = df.age.apply(lambda x: True if x < 23 else False)
 # In[4]:
 
 ct = pd.crosstab(df['class'], df.flag)
-sns.heatmap(ct.T, annot=True, fmt='d', cmap='bone_r')
+#sns.heatmap(ct.T, annot=True, fmt='d', cmap='bone_r')
 
 
 # In[5]:
 
-sns.heatmap(ct.T/ct.sum(axis=1), annot=True, cmap='bone_r')
+#sns.heatmap(ct.T/ct.sum(axis=1), annot=True, cmap='bone_r')
 
 
 # In[6]:
 
 ct = pd.crosstab(df['class'], df.flag)
-sns.heatmap(ct.T, annot=True, fmt='d', cmap='bone_r')
+#sns.heatmap(ct.T, annot=True, fmt='d', cmap='bone_r')
 
 
 # ## Generate Splits
@@ -78,18 +81,51 @@ splits = [x for x in splitter]
 # ### Slice DF
 
 # In[8]:
+continuous_vars = ['age', 'price', 'duration_in_mins', 'price_per_min', 'n_ads', 'n_distinct_locations', 'location_tree_length', 'n_outcall', 'n_incall', 'n_incall_and_outcall', 'n_cooccurring_phones', 'price_per_min' ]
+continuous_means = df.groupby('phone')[continuous_vars].mean()
+continuous_means = continuous_means.rename(columns = {k+'_mean':k for k in continuous_means.columns})
+#continuous_sums = df.groupby('phone')[continuous_vars].sum()
+#continuous_sums = continuous_sums.rename(columns = {k+'_sum':k for k in continuous_sums.columns})
+#continuous = pd.concat([continuous_means, continuous_sums], axis=1)
+continuous = continuous_means
+flag_dummies = pd.get_dummies(df['flag'])
+flag_dummies = pd.concat([df['phone'], flag_dummies], axis=1)
+discrete = flag_dummies.groupby('phone').aggregate([np.mean, np.sum])
+phone_level = pd.concat([continuous, discrete], axis=1)
+phone_level_label = df.groupby('phone')['class'].max()
+phone_level.index = range(len(phone_level))
+phone_level = phone_level.reindex()
+phone_level_label.index = range(len(phone_level_label))
+phone_level_label = phone_level_label.reindex()
+phone_level = phone_level.fillna(0)
 
 df_X = df.ix[:, ['age',
-                 'lt_23',
                  'price',
                  'duration_in_mins',
+                 'n_ads',
+                 'n_distinct_locations',
+                 'location_tree_length',
+                 'n_outcall',
+                 'n_incall',
+                 'n_incall_and_outcall',
+                 'n_cooccurring_phones',
                  'price_per_min',
                  'flag', 'ethnicity']].copy()
 
-df_X.age = df_X.age.fillna(5000000)
-df_X.price = df_X.price.fillna(5000000)
-df_X.duration_in_mins = df_X.duration_in_mins.fillna(5000000)
-df_X.price_per_min = df_X.price_per_min.fillna(5000000)
+del df_X['ethnicity']
+df_X['age_missing'] = df_X['age'].isnull()
+df_X['price_missing'] = df_X['price'].isnull()
+df_X['n_ads'] = df_X['n_ads'].isnull()
+df_X['n_distinct_locations'] = df_X['n_distinct_locations'].fillna(0)
+df_X['location_tree_length'] = df_X['location_tree_length'].fillna(0)
+df_X['n_outcall'] = df_X['n_outcall'].fillna(0)
+df_X['n_incall'] = df_X['n_incall'].fillna(0)
+df_X['n_incall_and_outcall'] = df_X['n_incall_and_outcall'].fillna(0)
+df_X['n_cooccurring_phones'] = df_X['n_cooccurring_phones'].fillna(0)
+df_X.age = df_X.age.fillna(0)
+df_X.price = df_X.price.fillna(0)
+df_X.duration_in_mins = df_X.duration_in_mins.fillna(0)
+df_X.price_per_min = df_X.price_per_min.fillna(0)
 df_X = pd.get_dummies(df_X)
 
 
@@ -97,18 +133,18 @@ df_X = pd.get_dummies(df_X)
 
 # In[33]:
 
-def train_tester(df_X_train, y_train, df_X_test, y_test):
-    lr = LinearRegression()
-    lr.fit(df_X_train, y_train)
-    y_pred = lr.predict(df_X_test)
-    fpr, tpr, thresholds = roc_curve(y_test.values, y_pred)
-    return {'model':lr,
-            'y_pred': y_pred,
-            'y_test': y_test.values,
-            'lr_score': lr.score(df_X_test, y_test),
-            'roc': (fpr, tpr, thresholds),
-            'auc': auc(fpr, tpr)
-            }
+#def train_tester(df_X_train, y_train, df_X_test, y_test):
+    #lr = LinearRegression()
+    #lr.fit(df_X_train, y_train)
+    #y_pred = lr.predict(df_X_test)
+    #fpr, tpr, thresholds = roc_curve(y_test.values, y_pred)
+    #return {'model':lr,
+            #'y_pred': y_pred,
+            #'y_test': y_test.values,
+            #'lr_score': lr.score(df_X_test, y_test),
+            #'roc': (fpr, tpr, thresholds),
+            #'auc': auc(fpr, tpr)
+            #}
 
 
 #p = mp.Pool(10)
@@ -156,70 +192,30 @@ def all_scoring_metrics(clf, X, y, stratified_kfold):
     return pd.DataFrame(out)
 
 eval_columns = ['f1','accuracy','true_negative_rate','true_positive_rate','roc_auc']
-clf = RandomForestClassifier(oob_score=True, random_state=2, n_estimators=100, n_jobs=-1, class_weight="balanced")
-del df_X['ethnicity']
-metrics = all_scoring_metrics(clf, df_X, df['class'], StratifiedKFold(df['class'], 10))
+price_cols = ['duration_in_mins','price','price_per_min']
+
+# work at phone level
+print("_____")
+print("Work at phone level...")
+phone_clf = RandomForestClassifier(oob_score=True, random_state=2, n_estimators=100, n_jobs=-1, class_weight="balanced")
+metrics = all_scoring_metrics(phone_clf, phone_level, phone_level_label, StratifiedKFold(phone_level_label, 10))
 print("Results (averaged from 10 fold cross validation and computed out of sample)")
 print(metrics[[i for i in metrics.columns if i in eval_columns]])
-importances = metrics[[i for i in metrics.columns if i not in eval_columns]]
-price_cols = ['duration_in_mins','price','price_per_min']
-print('Price importances: %s' % importances[[i for i in importances.columns if i in price_cols]].sum(axis=1).iloc[0])
-print('Age importances: %s' % importances['age'].iloc[0])
-
+#importances = metrics[[i for i in metrics.columns if i not in eval_columns]]
+#print('Price importances: %s' % importances[[i for i in importances.columns if i in price_cols]].sum(axis=1).iloc[0])
+#print('Age importances: %s' % importances['age'].iloc[0])
 #p.close()
 #p.join()
 
 
-## In[34]:
-
-#pd.Series([lr['lr_score'] for lr in lrs]).describe()
-
-
-## In[36]:
-
-#pd.Series([lr['auc'] for lr in lrs]).describe()
-
-
-## With these splits and features, our linear model _juuuuust_ a little better than the mean. Thanks, skewed data :(
-
-## In[29]:
-
-#roc_df = pd.DataFrame({'fpr': pd.DataFrame.from_records([lr['roc'][0] for lr in lrs]).apply(np.mean),
-                       #'tpr': pd.DataFrame.from_records([lr['roc'][1] for lr in lrs]).apply(np.mean)})
-#roc_df.set_index('fpr', inplace=True)
-
-
-## In[32]:
-
-#roc_df.plot()
-
-
-## In[ ]:
-
-#df_slice = df.ix[:, ['label','age', 'lt_23', 'price', 'duration_in_mins', 'price_per_min']].copy()
-
-#for x in ['age', 'price', 'duration_in_mins', 'price_per_min']:
-    #df_slice[x] = df_slice[x].fillna(5000000)
-
-#df_X = df_slice.ix[:, ['age', 'price', 'lt_23', 'duration_in_mins', 'price_per_min']]
-#y = df_slice.label
-
-#lr = LinearRegression()
-#lr.fit(df_X, y)
-#print(lr.coef_.shape)
-#print(lr.intercept_)
-#lr.score(df_X, y)
-
-
-## In[ ]:
-
-
-
-
-## ## Simple, unfolded, dumb random forest
-
-## In[ ]:
-
-#etc = ExtraTreesClassifier()
-
+# work at ad level
+print("_____")
+print("Work at ad level...")
+clf = RandomForestClassifier(oob_score=True, random_state=2, n_estimators=100, n_jobs=-1, class_weight="balanced")
+metrics = all_scoring_metrics(clf, df_X, df['class'], StratifiedKFold(df['class'], 2))
+print("Results (averaged from 10 fold cross validation and computed out of sample)")
+print(metrics[[i for i in metrics.columns if i in eval_columns]])
+importances = metrics[[i for i in metrics.columns if i not in eval_columns]]
+print('Price importances: %s' % importances[[i for i in importances.columns if i in price_cols]].sum(axis=1).iloc[0])
+print('Age importances: %s' % importances['age'].iloc[0])
 
