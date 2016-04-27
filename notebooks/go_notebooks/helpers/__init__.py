@@ -19,6 +19,7 @@ def disaggregated_df(df, aggregate_col, sep):
     :returns: `pandas.DataFrame` --
     """
     from itertools import chain
+    import pandas as pd
 
     good_slice = df.ix[df[aggregate_col].apply(lambda x: x.find(sep) == -1)]
     bad_slice = df.ix[df[aggregate_col].apply(lambda x: x.find(sep) > -1)]
@@ -38,7 +39,7 @@ def disaggregated_df(df, aggregate_col, sep):
 
 def aggregated_df(df, disaggregated_col, key_cols, sep):
     """
-    Takes a colomn that has been disaggregated, and fuses the contents back together
+    Takes a column that has been disaggregated, and fuses the contents back together
     :param pandas.DataFrame df:
     :param str disaggregated_col:
     :param str|list key_cols:
