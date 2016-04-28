@@ -22,6 +22,7 @@ from sklearn.metrics import auc
 from sklearn.cross_validation import StratifiedKFold
 from sklearn.metrics import roc_auc_score
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier
 import ipdb
 
 def dummify_df(df, cols_to_dummy, sep, vals_to_drop='nan'):
@@ -256,7 +257,7 @@ price_cols = ['duration_in_mins','price','price_per_min']
 print("_____")
 print("Work at phone level...")
 num_folds = 10
-phone_clf = RandomForestClassifier(oob_score=True, random_state=2, n_estimators=100, n_jobs=-1, class_weight="balanced")
+phone_clf = RandomForestClassifier(oob_score=True, random_state=2, n_estimators=100, n_jobs=-1, class_weight="balanced", bootstrap=True)
 metrics = all_scoring_metrics(phone_clf, phone_level, phone_level_label, StratifiedKFold(phone_level_label, num_folds))
 print("Results (averaged from %s fold cross validation and computed out of sample)" % num_folds)
 means = metrics.mean()[[i for i in metrics.columns if i in eval_columns]]
