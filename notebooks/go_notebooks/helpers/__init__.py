@@ -1,6 +1,3 @@
-from aggregates import add_aggregates
-
-
 def df_of_tables_for_dd_ids(dd_ids, sqlite_tables, sql_con):
     """
     :param list dd_ids: list of Deep Dive IDs to retrieve
@@ -211,6 +208,9 @@ def all_scoring_metrics(clf, X, y, stratified_kfold):
     :param stratified_kfold:
     :returns: `pandas.DataFrame` --
     """
+    from sklearn.metrics import roc_auc_score
+    import pandas as pd
+    
     out = []
     for i, (train, test) in enumerate(stratified_kfold):
         clf.fit(X.loc[train], y.loc[train])
