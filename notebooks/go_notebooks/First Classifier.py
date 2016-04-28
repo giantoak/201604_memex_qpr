@@ -24,6 +24,34 @@ from sklearn.metrics import roc_auc_score
 from sklearn.ensemble import RandomForestClassifier
 import ipdb
 
+def dummify_df(df, cols_to_dummy, sep, vals_to_drop='nan'):
+    """
+    get_dummy() on a df has some issues with dataframe-level operations
+    when the column has co-occuring values.
+    :param pandas.DataFrame df:
+    :param list|str cols_to_dummy:
+    :param str sep:
+    :param list|str vals_to_drop:
+    :returns: `pandas.DataFrame` --
+    """
+    if isinstance(cols_to_dummy, str):
+        cols_to_dummy = [cols_to_dummy]
+
+    if isinstance(vals_to_drop, str):
+        vals_to_drop = [vals_to_drop]
+
+    for col_to_dummy in cols_to_dummy:
+        dummy_df = df[col_to_dummy].str.get_dummies(sep=sep)
+        for col in vals_to_drop:
+            if col in dummy_df.columns:
+                del dummy_df[col]
+
+        dummy_df.columns = ['{}_{}'.format(col_to_dummy, x) for x in dummy_df.columns]
+        df = df.join(dummy_df)
+        del df[col_to_dummy]
+
+    return df
+
 #df = pd.read_csv('../../data/merged/data_to_use_by_ad_v2.csv')
 df = pd.read_csv('../../data/merged/data_to_use_by_ad_v3_with_exp_imgs.csv')
 
@@ -96,10 +124,20 @@ phone_level_vars = ['n_ads', 'n_distinct_locations', 'location_tree_length', 'n_
 numerical = df.groupby('phone')[numerical_vars].describe().unstack() # add distributions of these continuous variables
 phone_level_vars = df.groupby('phone')[phone_level_vars].max()
 #continuous = continuous_means
-flag_dummies = pd.get_dummies(df['flag'])
-flag_dummies = pd.concat([df['phone'], flag_dummies], axis=1)
+agg_category_cols = ['flag', 'ethnicity']
+
+df_old = df.copy()
+for a_c_c in agg_category_cols:
+    df[a_c_c].fillna('', inplace=True)
+    #df[a_c_c] = df[a_c_c].apply(lambda x: x.replace('|',';'))
+    df[a_c_c] = df[a_c_c].apply(lambda x: x.replace(' ','|'))
+    df = dummify_df(df, a_c_c, '|')
+    print('post-{}: {}'.format(a_c_c, df.shape))
+#flag_dummies = pd.get_dummies(df['flag'])
+#flag_dummies = pd.concat([df['phone'], flag_dummies], axis=1)
 #discrete = flag_dummies.groupby('phone').aggregate([np.mean, np.sum])
-discrete = flag_dummies.groupby('phone').mean()
+discrete = df.groupby('phone')[[i for i in df.columns if 'flag' in i or 'ethnicity' in i]].mean()
+#discrete = flag_dummies.groupby('phone').mean()
 phone_level = pd.concat([numerical, discrete, phone_level_vars], axis=1)
 phone_level['has_images'] = df.groupby('phone')['has_images'].max()
 phone_level_label = df.groupby('phone')['class'].max()
