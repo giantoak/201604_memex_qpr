@@ -229,7 +229,10 @@ print("------")
 print("Fittin final classifier on all data...")
 fit_cf = phone_clf.fit(phone_level, phone_level_label)
 cPickle.dump(fit_cf, open('giant_oak_RF.pkl','w'))
-phone_level.to_csv('giant_oak_features.csv', index=False)
+phones_index = df.groupby('phone')['price'].max().index
+phone_level.index = phones_index
+phone_level = phone_level.reindex()
+phone_level.to_csv('giant_oak_features.csv')
 
 
 
