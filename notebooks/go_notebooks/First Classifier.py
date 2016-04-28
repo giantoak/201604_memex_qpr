@@ -10,6 +10,7 @@ from itertools import chain
 import html
 import ujson as json
 import multiprocessing as mp
+import cPickle
 import numpy as np
 import pandas as pd
 #import seaborn as sns
@@ -223,6 +224,15 @@ print("Results (averaged from %s fold cross validation and computed out of sampl
 means = metrics.mean()[[i for i in metrics.columns if i in eval_columns]]
 stds = metrics.std()[[i for i in metrics.columns if i in eval_columns]]
 print(pd.concat([means,stds], axis=1).rename(columns={0:'mean',1:'std'}))
+
+print("------")
+print("Fittin final classifier on all data...")
+fit_cf = phone_clf.fit(phone_level, phone_level_label)
+cPickle.dump(fit_cf, open('giant_oak_RF.pkl','w'))
+phone_level.to_csv('giant_oak_features.csv', index=False)
+
+
+
 #importances = metrics.mean()[[i for i in metrics.columns if i not in eval_columns]]
 #print('Price importances: %s' % importances[[i for i in importances.columns if 'price' in i or 'dur' in i]].sum(axis=1).iloc[0])
 #print('Age importances: %s' % importances[[i for i in importances.columns if 'age' in i]].sum(axis=1).iloc[0])
