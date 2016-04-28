@@ -98,12 +98,10 @@ phones_in_dd = set(['(214) 643-0854', '(214) 905-1457', '(225) 572-9627',
                     '(912) 318-2015', '(912) 318-2157'])
 
 df = pd.read_csv('../../data/merged/partial_test_data_to_use_by_ad_with_exp_imgs.csv')
-peter = pd.read_csv('../../data/merged/partial_test_data_to_use_by_ad.csv')
 df['phone'] = df['phone'].fillna('')
 df=df[df['phone'].isin(phones_in_dd)]
 df = disaggregated_df(df, 'phone', '|')
 df_old = df.copy()
-ipdb.set_trace()
 
 steve = pd.read_csv('../../data/merged/phones_by_month.csv')
 steve_phone=steve[['phone','n_ads','n_distinct_locations','location_tree_length','n_outcall','n_incall','n_incall_and_outcall','n_cooccurring_phones']].drop_duplicates()
@@ -174,6 +172,7 @@ for a_c_c in agg_category_cols:
     df[a_c_c] = df[a_c_c].apply(lambda x: x.replace(' ','|'))
     df = dummify_df(df, a_c_c, '|')
     print('post-{}: {}'.format(a_c_c, df.shape))
+old_colums_ad_level = set(df.columns)
 #flag_dummies = pd.get_dummies(df['flag'])
 #flag_dummies = pd.concat([df['phone'], flag_dummies], axis=1)
 #discrete = flag_dummies.groupby('phone').aggregate([np.mean, np.sum])
@@ -204,8 +203,45 @@ output=[{'score':i[0],'phone':i[1]} for i in zip(results,phone_level_index)]
 
 open('giant_oak_phone_results.json','w').write(json.dumps(output))
 
+df_X = df.ix[:, ['age',
+                 'price',
+                 'duration_in_mins',
+                 'n_ads',
+                 'n_distinct_locations',
+                 'location_tree_length',
+                 'n_outcall',
+                 'n_incall',
+                 'n_incall_and_outcall',
+                 'n_cooccurring_phones',
+                 'price_per_min'] + [i for i in df.columns if 'ethnicity' in i or 'flag' in i]].copy()
 
+df_X['age_missing'] = df_X['age'].isnull()
+df_X['price_missing'] = df_X['price'].isnull()
+df_X['n_ads'] = df_X['n_ads'].isnull()
+df_X['n_distinct_locations'] = df_X['n_distinct_locations'].fillna(0)
+df_X['location_tree_length'] = df_X['location_tree_length'].fillna(0)
+df_X['n_outcall'] = df_X['n_outcall'].fillna(0)
+df_X['n_incall'] = df_X['n_incall'].fillna(0)
+df_X['n_incall_and_outcall'] = df_X['n_incall_and_outcall'].fillna(0)
+df_X['n_cooccurring_phones'] = df_X['n_cooccurring_phones'].fillna(0)
+df_X.age = df_X.age.fillna(0)
+df_X.price = df_X.price.fillna(0)
+df_X.duration_in_mins = df_X.duration_in_mins.fillna(0)
+df_X.price_per_min = df_X.price_per_min.fillna(0)
+df_X = pd.get_dummies(df_X)
+new_cols_ad_level = set(df_X.columns)
 
+old_df_X = pd.read_csv('giant_oak_features_ad_level.csv')
+old_colums_ad_level = set(old_df_X.columns)
+ad_level_clf = cPickle.load(open('giant_oak_RF_ad_level.pkl'))
+print(new_cols_ad_level-old_colums_ad_level)
+print(old_colums_ad_level-new_cols_ad_level)
+for i in old_colums_ad_level:
+    if i not in new_cols_ad_level:
+        df_X[i]=0
+cdr_id = df['cdr_id']
+del df_X['cdr_id']
+ad_level_results = ad_level_clf.predict_proba(df_X)[:,1]
+ad_level_output=[{'score':i[0],'cdr_id':i[1]} for i in zip(ad_level_results,cdr_id)]
 
-
-
+open('giant_oak_ad_results.json','w').write(json.dumps(ad_level_output))

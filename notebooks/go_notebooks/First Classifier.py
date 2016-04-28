@@ -158,10 +158,8 @@ df_X = df.ix[:, ['age',
                  'n_incall',
                  'n_incall_and_outcall',
                  'n_cooccurring_phones',
-                 'price_per_min',
-                 'flag', 'ethnicity']].copy()
+                 'price_per_min'] + [i for i in df.columns if 'ethnicity' in i or 'flag' in i]].copy()
 
-del df_X['ethnicity']
 df_X['age_missing'] = df_X['age'].isnull()
 df_X['price_missing'] = df_X['price'].isnull()
 df_X['n_ads'] = df_X['n_ads'].isnull()
@@ -251,7 +249,7 @@ def all_scoring_metrics(clf, X, y, stratified_kfold):
 #me = phone_number_stratification(df['phone'], df, df['class'], 2)
 
 eval_columns = ['f1','accuracy','true_negative_rate','true_positive_rate','roc_auc']
-price_cols = ['duration_in_mins','price','price_per_min']
+price_cols = ['duration','price','min']
 
 # work at phone level
 print("_____")
@@ -283,14 +281,22 @@ phone_level.to_csv('giant_oak_features.csv')
 #p.join()
 
 
-## work at ad level
-#print("_____")
-#print("Work at ad level...")
-#clf = RandomForestClassifier(oob_score=True, random_state=2, n_estimators=100, n_jobs=-1, class_weight="balanced")
-#metrics = all_scoring_metrics(clf, df_X, df['class'], StratifiedKFold(df['class'], 2))
-#print("Results (averaged from 10 fold cross validation and computed out of sample)")
-#print(metrics[[i for i in metrics.columns if i in eval_columns]])
-#importances = metrics[[i for i in metrics.columns if i not in eval_columns]]
-#print('Price importances: %s' % importances[[i for i in importances.columns if i in price_cols]].sum(axis=1).iloc[0])
-#print('Age importances: %s' % importances['age'].iloc[0])
+df_X.reset_index(drop=True, inplace=True)
+df.reset_index(drop=True, inplace=True)
+# work at ad level
+print("_____")
+print("Work at ad level...")
+clf = RandomForestClassifier(oob_score=True, random_state=2, n_estimators=100, n_jobs=-1, class_weight="balanced")
+metrics = all_scoring_metrics(clf, df_X, df['class'], StratifiedKFold(df['class'], 10))
+print("Results (averaged from 10 fold cross validation and computed out of sample)")
+print(metrics[[i for i in metrics.columns if i in eval_columns]])
+importances = metrics[[i for i in metrics.columns if i not in eval_columns]]
+print('Price importances: %s' % importances[[i for i in importances.columns if 'price' in i or 'min' in i]].sum(axis=1).iloc[0])
+print('Age importances: %s' % importances['age'].iloc[0])
 
+print("------")
+print("Fittin final classifier on all data...")
+fit_cf = clf.fit(df_X, df['class'])
+cPickle.dump(fit_cf, open('giant_oak_RF_ad_level.pkl','w'))
+df_X['cdr_id'] = df['cdr_id']
+df_X.to_csv('giant_oak_features_ad_level.csv', index=False)
