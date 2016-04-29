@@ -289,7 +289,7 @@ print("Work at ad level...")
 clf = RandomForestClassifier(oob_score=True, random_state=2, n_estimators=100, n_jobs=-1, class_weight="balanced")
 metrics = all_scoring_metrics(clf, df_X, df['class'], StratifiedKFold(df['class'], 10))
 print("Results (averaged from 10 fold cross validation and computed out of sample)")
-print(metrics[[i for i in metrics.columns if i in eval_columns]])
+print(metrics.mean()[[i for i in metrics.columns if i in eval_columns]])
 importances = metrics[[i for i in metrics.columns if i not in eval_columns]]
 print('Price importances: %s' % importances[[i for i in importances.columns if 'price' in i or 'min' in i]].sum(axis=1).iloc[0])
 print('Age importances: %s' % importances['age'].iloc[0])
