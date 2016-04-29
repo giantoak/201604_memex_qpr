@@ -217,10 +217,10 @@ def all_scoring_metrics(clf, X, y, stratified_kfold):
         y_pred = clf.predict(X.loc[test])
         y_test = y.loc[test]
 
-    output_features = score_metrics(y_test, y_pred)
-    output_features.update({i[0]: i[1]
+        output_features = score_metrics(y_test, y_pred)
+        output_features.update({i[0]: i[1]
                             for i in zip(X.columns, clf.feature_importances_)})
-    output_features['roc_auc'] = roc_auc_score(
+        output_features['roc_auc'] = roc_auc_score(
         y_test, clf.predict_proba(X.loc[test])[:, 1])
-    out.append(output_features)
+        out.append(output_features)
     return pd.DataFrame(out)
