@@ -183,14 +183,21 @@ def lr_train_tester(df_X_train, y_train, df_X_test, y_test):
             }
 
 
-def draw_roc(cur_metrics_df, classifier_name=''):
+def draw_rocs(cur_metrics_df, classifier_name='unspecified classifier'):
     """
-    
+    Shamelessly modified from \
+    http://scikit-learn.org/\
+    stable/\
+    auto_examples/\
+    model_selection/\
+    plot_roc_crossval.html#example-model-selection-plot-roc-crossval-py
     :param pandas.DataFrame cur_metrics_df:
     :param str classifier_name:
     """
     from numpy import linspace
     from scipy import interp
+    from sklearn.metrics import auc
+    
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -201,20 +208,29 @@ def draw_roc(cur_metrics_df, classifier_name=''):
     all_tpr = []
 
     for i in range(cur_metrics_df.shape[0]):
-        mean_tpr += interp(mean_fpr, cur_metrics_df.loc[i, 'roc:fpr'], cur_metrics_df.loc[i, 'roc:tpr'])
+        mean_tpr += interp(mean_fpr,
+                           cur_metrics_df.loc[i, 'roc_fpr'],
+                           cur_metrics_df.loc[i, 'roc_tpr'])
         mean_tpr[0] = 0.0
-
+        plt.plot(cur_metrics_df.loc[i, 'roc_fpr'],
+                 cur_metrics_df.loc[i, 'roc_tpr'],
+                 lw=1,
+                 label='ROC fold %d (area = %0.2f)' % (i, cur_metrics_df.loc[i, 'roc_auc']))
+        
+    plt.plot([0, 1], [0, 1], '--', label='Luck')
+    
     mean_tpr /= cur_metrics_df.shape[0]
     mean_tpr[-1] = 1.0
-
-    plt.plot(mean_fpr, mean_tpr,
-             label='Mean ROC (area = %0.2f)' % cur_metrics_df['roc:auc'].mean(), lw=2)
-
+    
+    mean_auc = auc(mean_fpr, mean_tpr)
+    plt.plot(mean_fpr, mean_tpr, 'k--',
+         label='Mean ROC (area = %0.2f)' % mean_auc, lw=2)
+    
     plt.xlim([-0.05, 1.05])
     plt.ylim([-0.05, 1.05])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.title('Mean ROC on {} Stratified K-Fold {}'.format(cur_metrics_df.shape[0], classifier_name))
+    plt.title('ROCs for {} on {} Folds'.format(classifier_name, cur_metrics_df.shape[0]))
     plt.legend(loc="lower right")
     plt.show()
 
@@ -228,9 +244,6 @@ def score_metrics(y_test, y_pred):
     :param y_pred:
     :returns: `dict` -- Performance scores
     """
-    from sklearn.metrics import roc_curve
-    from sklearn.metrics import auc
-    
     true_pos = (y_test & y_pred).sum()
     true_neg = ((~y_test) & (~y_pred)).sum()
     false_pos = ((~y_test) & y_pred).sum()
@@ -240,17 +253,11 @@ def score_metrics(y_test, y_pred):
     true_neg_rate = true_neg / float(true_neg + false_pos)
     accuracy = (true_pos + true_neg) / float(true_pos + true_neg + false_pos + false_neg)
     
-    fpr, tpr, thresholds = roc_curve(y_test, y_pred)
-    
     return {
         'true_positive_rate': true_pos_rate,
         'true_negative_rate': true_neg_rate,
         'f1': f1,
         'accuracy': accuracy,
-        'roc:fpr': fpr,
-        'roc:tpr': tpr,
-        'roc:thresholds': thresholds,
-        'roc:auc': auc(fpr, tpr)
     }
 
 
@@ -263,19 +270,31 @@ def all_scoring_metrics(clf, X_df, y_series, stratified_kfold):
     :param iterable(tuple) stratified_kfold:
     :returns: `pandas.DataFrame` --
     """
-    from sklearn.metrics import roc_auc_score
+    from numpy import linspace
     from pandas import DataFrame
+    from sklearn.metrics import auc
+    from sklearn.metrics import roc_curve
     
     out = []
+    mean_tpr = 0.0
+    mean_fpr = linspace(0, 1, 100)
+    all_tpr = []
     for i, (train, test) in enumerate(stratified_kfold):
         clf.fit(X_df.iloc[train, :], y_series.iloc[train])
+        
         y_pred = clf.predict(X_df.iloc[test, :])
         y_test = y_series.iloc[test]
         output_features = score_metrics(y_test, y_pred)
         output_features.update(
-            {i[0]: i[1] for i in zip(X_df.columns, clf.feature_importances_)})
-        output_features['roc_auc'] = roc_auc_score(
-            y_test,
-            clf.predict_proba(X_df.iloc[test, :])[:, 1])
+            {i[0]: i[1]
+             for i in zip(X_df.columns, clf.feature_importances_)})
+        
+        # Compute ROC curve and area the curve
+        probas_ = clf.predict_proba(X_df.iloc[test, :])
+        output_features['roc_fpr'], \
+        output_features['roc_tpr'], \
+        output_features['roc_thresholds'] = roc_curve(y_test, probas_[:, 1])
+        output_features['roc_auc'] = auc(output_features['roc_fpr'],
+                                         output_features['roc_tpr'])
         out.append(output_features)
     return DataFrame(out)
