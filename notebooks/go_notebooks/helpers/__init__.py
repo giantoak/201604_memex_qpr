@@ -183,6 +183,41 @@ def lr_train_tester(df_X_train, y_train, df_X_test, y_test):
             }
 
 
+def draw_roc(cur_metrics_df, classifier_name=''):
+    """
+    
+    :param pandas.DataFrame cur_metrics_df:
+    :param str classifier_name:
+    """
+    from numpy import linspace
+    from scipy import interp
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    
+    # This is SOOOOO inefficient. Fix later.
+    mean_tpr = 0.0
+    mean_fpr = linspace(0, 1, 100)
+    all_tpr = []
+
+    for i in range(cur_metrics_df.shape[0]):
+        mean_tpr += interp(mean_fpr, cur_metrics_df.loc[i, 'roc:fpr'], cur_metrics_df.loc[i, 'roc:tpr'])
+        mean_tpr[0] = 0.0
+
+    mean_tpr /= cur_metrics_df.shape[0]
+    mean_tpr[-1] = 1.0
+
+    plt.plot(mean_fpr, mean_tpr,
+             label='Mean ROC (area = %0.2f)' % cur_metrics_df['roc:auc'].mean(), lw=2)
+
+    plt.xlim([-0.05, 1.05])
+    plt.ylim([-0.05, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Mean ROC on {} Stratified K-Fold {}'.format(cur_metrics_df.shape[0], classifier_name))
+    plt.legend(loc="lower right")
+    plt.show()
+
    
 # Jeff's scoring tools!
 
