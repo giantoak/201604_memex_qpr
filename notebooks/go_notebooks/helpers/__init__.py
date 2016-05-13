@@ -107,24 +107,35 @@ def aggregated_df(df, disaggregated_col, key_cols, sep):
     return df.drop_duplicates()
 
 
-def dummify_df(df, cols_to_dummy, sep, vals_to_drop='nan'):
+def dummify_df(df, cols_to_dummy, seps, vals_to_drop='nan'):
     """
     get_dummy() on a df has some issues with dataframe-level operations
     when the column has co-occuring values.
 
     :param pandas.DataFrame df:
     :param list|str cols_to_dummy:
-    :param str sep:
+    :param list|str sep:
     :param list|str vals_to_drop:
     :returns: `pandas.DataFrame` --
     """
     if isinstance(cols_to_dummy, str):
         cols_to_dummy = [cols_to_dummy]
+        
+    if isinstance(seps, str):
+        seps = [seps]
 
     if isinstance(vals_to_drop, str):
         vals_to_drop = [vals_to_drop]
 
-    for col_to_dummy in cols_to_dummy:
+    if len(seps) == 1 and len(cols_to_dummy) > 1:
+        seps *= len(cols_to_dummy)
+        
+    if len(cols_to_dummy) != len(seps):
+        raise IndexError(
+            'len(cols_to_dummy) != len(seps): {} != {}'.format(len(cols_to_dummy),
+                                                              len(seps)))
+    
+    for sep, col_to_dummy in zip(seps, cols_to_dummy):
         dummy_df = df[col_to_dummy].str.get_dummies(sep=sep)
         for col in vals_to_drop:
             if col in dummy_df.columns:
