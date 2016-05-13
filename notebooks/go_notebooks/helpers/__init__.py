@@ -183,55 +183,64 @@ def lr_train_tester(df_X_train, y_train, df_X_test, y_test):
             }
 
 
+   
+# Jeff's scoring tools!
+
 def score_metrics(y_test, y_pred):
     """
+    
     :param y_test:
     :param y_pred:
-    :returns: `dict` --
+    :returns: `dict` -- Performance scores
     """
-    true_positives = (y_test & y_pred).sum()
-    true_negatives = ((~y_test) & (~y_pred)).sum()
-    false_positives = ((~y_test) & y_pred).sum()
-    false_negatives = (y_test & (~y_pred)).sum()
-    f1 = (2 * true_positives) / float(2 * true_positives +
-                                      false_negatives + false_positives)
-    true_positive_rate = true_positives / \
-        float(true_positives + false_negatives)
-    true_negative_rate = (
-        true_negatives / float(true_negatives + false_positives))
-    accuracy = (true_positives + true_negatives) / float(true_positives +
-                                                         true_negatives + false_positives + false_negatives)
-    return(
-        {
-            'true_positive_rate': true_positive_rate,
-            'true_negative_rate': true_negative_rate,
-            'f1': f1,
-            'accuracy': accuracy
-        }
-    )
+    from sklearn.metrics import roc_curve
+    from sklearn.metrics import auc
+    
+    true_pos = (y_test & y_pred).sum()
+    true_neg = ((~y_test) & (~y_pred)).sum()
+    false_pos = ((~y_test) & y_pred).sum()
+    false_neg = (y_test & (~y_pred)).sum()
+    f1 = (2. * true_pos) / (2. * true_pos + false_neg + false_pos)
+    true_pos_rate = true_pos / float(true_pos + false_neg)
+    true_neg_rate = true_neg / float(true_neg + false_pos)
+    accuracy = (true_pos + true_neg) / float(true_pos + true_neg + false_pos + false_neg)
+    
+    fpr, tpr, thresholds = roc_curve(y_test, y_pred)
+    
+    return {
+        'true_positive_rate': true_pos_rate,
+        'true_negative_rate': true_neg_rate,
+        'f1': f1,
+        'accuracy': accuracy,
+        'roc:fpr': fpr,
+        'roc:tpr': tpr,
+        'roc:thresholds': thresholds,
+        'roc:auc': auc(fpr, tpr)
+    }
 
 
-def all_scoring_metrics(clf, X, y, stratified_kfold):
+def all_scoring_metrics(clf, X_df, y_series, stratified_kfold):
     """
+    
     :param clf:
-    :param X:
-    :param y:
-    :param stratified_kfold:
+    :param pandas.DataFrame X_df:
+    :param pandas.Series y_series:
+    :param iterable(tuple) stratified_kfold:
     :returns: `pandas.DataFrame` --
     """
     from sklearn.metrics import roc_auc_score
-    import pandas as pd
+    from pandas import DataFrame
     
     out = []
     for i, (train, test) in enumerate(stratified_kfold):
-        clf.fit(X.loc[train], y.loc[train])
-        y_pred = clf.predict(X.loc[test])
-        y_test = y.loc[test]
-
+        clf.fit(X_df.iloc[train, :], y_series.iloc[train])
+        y_pred = clf.predict(X_df.iloc[test, :])
+        y_test = y_series.iloc[test]
         output_features = score_metrics(y_test, y_pred)
-        output_features.update({i[0]: i[1]
-                            for i in zip(X.columns, clf.feature_importances_)})
+        output_features.update(
+            {i[0]: i[1] for i in zip(X_df.columns, clf.feature_importances_)})
         output_features['roc_auc'] = roc_auc_score(
-        y_test, clf.predict_proba(X.loc[test])[:, 1])
+            y_test,
+            clf.predict_proba(X_df.iloc[test, :])[:, 1])
         out.append(output_features)
-    return pd.DataFrame(out)
+    return DataFrame(out)

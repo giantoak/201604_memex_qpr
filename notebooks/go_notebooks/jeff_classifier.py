@@ -136,36 +136,8 @@ df_X = pd.get_dummies(df_X)
 #  df['class'].iloc[test_ix]
 #)
 
-def score_metrics(y_test, y_pred):
-    true_pos = (y_test & y_pred).sum()
-    true_neg = ((~y_test) & (~y_pred)).sum()
-    false_pos = ((~y_test) & y_pred).sum()
-    false_neg = (y_test & (~y_pred)).sum()
-    f1 = (2. * true_pos) / (2. * true_pos + false_neg + false_pos)
-    true_pos_rate = true_pos / float(true_pos + false_neg)
-    true_neg_rate = true_neg / float(true_neg + false_pos)
-    accuracy = (true_pos + true_neg) / float(true_pos + true_neg + false_pos + false_neg)
-    return {
-        'true_positive_rate': true_pos_rate,
-        'true_negative_rate': true_neg_rate,
-        'f1': f1,
-        'accuracy': accuracy
-    }
-
-
-def all_scoring_metrics(clf, X, y, stratified_kfold):
-    out = []
-    for i, (train, test) in enumerate(stratified_kfold):
-        clf.fit(X.loc[train], y.loc[train])
-        y_pred = clf.predict(X.loc[test])
-        y_test = y.loc[test]
-        output_features = score_metrics(y_test, y_pred)
-        output_features.update(
-            {i[0]: i[1] for i in zip(X.columns, clf.feature_importances_)})
-        output_features['roc_auc'] = roc_auc_score(
-            y_test, clf.predict_proba(X.loc[test])[:, 1])
-        out.append(output_features)
-    return pd.DataFrame(out)
+from helpers import score_metrics
+from helpers import all_scoring_metrics
 
 # def phone_number_stratification(phone_numbers, X, y, num_folds, X_phone_column='phone'):
     # '''
@@ -239,5 +211,3 @@ phone_level.to_csv('giant_oak_features.csv')
 #importances = metrics[[i for i in metrics.columns if i not in eval_columns]]
 #print('Price importances: %s' % importances[[i for i in importances.columns if i in price_cols]].sum(axis=1).iloc[0])
 #print('Age importances: %s' % importances['age'].iloc[0])
-
-Status API Training Shop Blog About
