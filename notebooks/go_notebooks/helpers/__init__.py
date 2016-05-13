@@ -191,8 +191,8 @@ def draw_rocs(cur_metrics_df, classifier_name='unspecified classifier'):
     auto_examples/\
     model_selection/\
     plot_roc_crossval.html#example-model-selection-plot-roc-crossval-py
-    :param pandas.DataFrame cur_metrics_df:
-    :param str classifier_name:
+    :param pandas.DataFrame cur_metrics_df: Must have 'roc_auc', 'roc_fpr', and 'roc_tpr' columns
+    :param str classifier_name: Name of classifier assoicated with metrics
     """
     from numpy import linspace
     from scipy import interp
@@ -217,14 +217,13 @@ def draw_rocs(cur_metrics_df, classifier_name='unspecified classifier'):
                  lw=1,
                  label='ROC fold %d (area = %0.2f)' % (i, cur_metrics_df.loc[i, 'roc_auc']))
         
-    plt.plot([0, 1], [0, 1], '--', label='Luck')
+    plt.plot([0, 1], [0, 1], ':', color=(0.0, 0.0, 0.0), label='Luck')
     
     mean_tpr /= cur_metrics_df.shape[0]
     mean_tpr[-1] = 1.0
     
-    mean_auc = auc(mean_fpr, mean_tpr)
     plt.plot(mean_fpr, mean_tpr, 'k--',
-         label='Mean ROC (area = %0.2f)' % mean_auc, lw=2)
+             label='Mean ROC (area = %0.2f)' % cur_metrics_df.roc_auc.mean(), lw=2)
     
     plt.xlim([-0.05, 1.05])
     plt.ylim([-0.05, 1.05])
@@ -284,7 +283,9 @@ def all_scoring_metrics(clf, X_df, y_series, stratified_kfold):
         
         y_pred = clf.predict(X_df.iloc[test, :])
         y_test = y_series.iloc[test]
+        
         output_features = score_metrics(y_test, y_pred)
+        
         output_features.update(
             {i[0]: i[1]
              for i in zip(X_df.columns, clf.feature_importances_)})
